@@ -80,10 +80,13 @@ elseif(WIN32)
     set(CMAKE_SHARED_LIBRARY_PREFIX "")
     set(CMAKE_SHARED_LIBRARY_SUFFIX ".xpl")
     
-    # Compiler flags
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
+    # Compiler flags - check compiler type
     if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+        # Visual Studio compiler flags
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /EHsc")
+    else()
+        # MinGW/GCC compiler flags
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
     endif()
     
     # X-Plane specific compiler definitions
@@ -122,9 +125,17 @@ elseif(WIN32)
     )
     
     # Use Windows symbol export file
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/win_exports.def"
-    )
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        # Visual Studio linker flags
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/win_exports.def"
+        )
+    else()
+        # MinGW/GCC linker flags - use --def-file for .def files
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            LINK_FLAGS "-Wl,--def-file=${CMAKE_CURRENT_SOURCE_DIR}/win_exports.def"
+        )
+    endif()
 
 elseif(UNIX AND NOT APPLE)
     # Linux configuration
