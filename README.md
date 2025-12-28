@@ -12,18 +12,9 @@ Each release includes:
 - `lin.xpl` - Linux (64-bit)
 - `XPAutoThrottle.zip` - All platforms
 
-### Automatic Release Process
-
-The GitHub Actions workflow automatically:
-- ✅ Builds for Windows, macOS, and Linux on every commit
-- ✅ Runs comprehensive cross-platform tests
-- ✅ Creates releases when the `VERSION` file is updated
-- ✅ Packages all platforms into convenient downloads
-- ✅ Generates installation instructions
-
 **Simply update the `VERSION` file and push to trigger a new release!**
 
-## 🛠 Installation
+## Installation
 
 ### Option 1: Use Pre-compiled Binaries (Recommended)
 
@@ -66,20 +57,3 @@ python build_all.py --platform linux
 ```
 
 The compiled plugin will be in the `build/` directory.
-
-## 🎮 Usage
-
-1. **Load X-Plane** with the plugin installed
-2. **Load any aircraft** - the plugin will automatically play a sound
-3. **Check Log.txt** for plugin status messages and OpenAL information
-4. **Each aircraft load** will play the sound at a progressively higher pitch
-
-### Creating a New Release
-
-1. **Update the `VERSION` file** with the new version number (e.g., `1.1.0`)
-2. **Commit and push** the change to the main branch
-3. **GitHub Actions will automatically**:
-   - Build all platforms
-   - Create a git tag
-   - Generate a GitHub release
-   - Upload all binaries

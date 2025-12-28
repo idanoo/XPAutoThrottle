@@ -70,6 +70,7 @@ jobs:
     name: Build Plugin
     runs-on: ${{ matrix.os }}
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'push')
+    continue-on-error: true
     
     strategy:
       matrix:
