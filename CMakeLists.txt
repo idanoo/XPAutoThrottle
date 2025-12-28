@@ -50,16 +50,16 @@ if(APPLE)
         PREFIX ""
     )
     
-    # Link X-Plane frameworks using -framework flags
-    target_link_libraries(${PROJECT_NAME}
-        "-framework XPLM"
-        "-framework XPWidgets"
-        "-framework Carbon"
-    )
-    
-    # Set framework search path and export symbols
+    # Set framework search path in linker flags
     set_target_properties(${PROJECT_NAME} PROPERTIES
         LINK_FLAGS "-F${XPLM_SDK_PATH}/Libraries/Mac -Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/mac_exports.txt"
+    )
+    
+    # Link X-Plane frameworks
+    target_link_libraries(${PROJECT_NAME}
+        "-framework" "XPLM"
+        "-framework" "XPWidgets"
+        "-framework" "Carbon"
     )
 
 elseif(WIN32)
@@ -166,11 +166,10 @@ elseif(UNIX AND NOT APPLE)
     )
     
     # Link X-Plane libraries
-    # On Linux, link against the SDK libraries using library search path
-    target_link_directories(${PROJECT_NAME} PRIVATE "${XPLM_SDK_PATH}/Libraries/Lin")
+    # On Linux, link directly to the .so files (they don't have lib prefix)
     target_link_libraries(${PROJECT_NAME}
-        XPLM_64
-        XPWidgets_64
+        "${XPLM_SDK_PATH}/Libraries/Lin/XPLM_64.so"
+        "${XPLM_SDK_PATH}/Libraries/Lin/XPWidgets_64.so"
         dl  # Dynamic link library
     )
     
