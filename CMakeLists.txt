@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(XP_AutoThrottle)
+project(XPAutoThrottle)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -70,6 +70,13 @@ if(APPLE)
 elseif(WIN32)
     # Windows configuration
     message(STATUS "Configuring for Windows...")
+    
+    # Force 64-bit build (X-Plane 12 requires 64-bit plugins)
+    # if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    #     message(STATUS "Building for 64-bit (detected)")
+    # else()
+    #     message(FATAL_ERROR "X-Plane 12 requires 64-bit plugins. Please use a 64-bit compiler.")
+    # endif()
     
     # X-Plane plugin settings
     set(CMAKE_SHARED_LIBRARY_PREFIX "")

@@ -40,15 +40,16 @@ if not exist "%PROJECT_DIR%SDK" (
     exit /b 1
 )
 
-echo Running CMake configuration...
-cmake -DCMAKE_BUILD_TYPE=Release "%PROJECT_DIR:~0,-1%"
+echo Running CMake configuration
+REM Force 64-bit build for X-Plane 12
+cmake -DCMAKE_BUILD_TYPE=Release -A x64 "%PROJECT_DIR:~0,-1%"
 if errorlevel 1 (
-    echo CMake configuration failed.
+    echo CMake configuration failed
     exit /b 1
 )
 
-echo Starting compilation...
-cmake --build . --config Release
+echo Starting compilation
+cmake --build %BUILD_DIR% --config Release
 if errorlevel 1 (
     echo Compilation failed.
     exit /b 1
