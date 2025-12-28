@@ -22,5 +22,9 @@ PLUGIN_API void XPluginDisable(void) {
 }
 
 PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFrom, int inMessage, void* inParam) {
+    // Suppress unused parameter warnings
+    (void)inFrom;
+    (void)inMessage;
+    (void)inParam;
     // Nothing to do
 }

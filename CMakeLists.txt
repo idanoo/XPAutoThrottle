@@ -50,26 +50,16 @@ if(APPLE)
         PREFIX ""
     )
     
-    # Link X-Plane frameworks
+    # Link X-Plane frameworks using -framework flags
     target_link_libraries(${PROJECT_NAME}
-        "${XPLM_SDK_PATH}/Libraries/Mac/XPLM.framework"
-        "${XPLM_SDK_PATH}/Libraries/Mac/XPWidgets.framework"
+        "-framework XPLM"
+        "-framework XPWidgets"
         "-framework Carbon"
     )
     
-    # Set framework search paths
+    # Set framework search path and export symbols
     set_target_properties(${PROJECT_NAME} PROPERTIES
-        FRAMEWORK_SEARCH_PATHS "${XPLM_SDK_PATH}/Libraries/Mac"
-    )
-    
-    # Set linker flags
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        LINK_FLAGS "-F${XPLM_SDK_PATH}/Libraries/Mac"
-    )
-    
-    # Ensure necessary symbols are exported
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        LINK_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS} -Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/mac_exports.txt"
+        LINK_FLAGS "-F${XPLM_SDK_PATH}/Libraries/Mac -Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/mac_exports.txt"
     )
 
 elseif(WIN32)
@@ -131,10 +121,9 @@ elseif(WIN32)
             LINK_FLAGS "/DEF:${CMAKE_CURRENT_SOURCE_DIR}/win_exports.def"
         )
     else()
-        # MinGW/GCC linker flags - use --def-file for .def files
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-            LINK_FLAGS "-Wl,--def-file=${CMAKE_CURRENT_SOURCE_DIR}/win_exports.def"
-        )
+        # MinGW/GCC - add .def file directly as a source file to the linker
+        # This is the correct way to use .def files with MinGW
+        target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/win_exports.def")
     endif()
 
 elseif(UNIX AND NOT APPLE)
@@ -177,9 +166,11 @@ elseif(UNIX AND NOT APPLE)
     )
     
     # Link X-Plane libraries
+    # On Linux, link against the SDK libraries using library search path
+    target_link_directories(${PROJECT_NAME} PRIVATE "${XPLM_SDK_PATH}/Libraries/Lin")
     target_link_libraries(${PROJECT_NAME}
-        "${XPLM_SDK_PATH}/Libraries/Lin/XPLM_64.so"
-        "${XPLM_SDK_PATH}/Libraries/Lin/XPWidgets_64.so"
+        XPLM_64
+        XPWidgets_64
         dl  # Dynamic link library
     )
     
