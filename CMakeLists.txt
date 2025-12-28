@@ -50,18 +50,21 @@ if(APPLE)
         PREFIX ""
     )
     
-    # Link X-Plane frameworks
-    # The -F flag must come before -framework flags
-    target_link_libraries(${PROJECT_NAME}
+    # Set framework search path using target_link_options
+    target_link_options(${PROJECT_NAME} PRIVATE
         "-F${XPLM_SDK_PATH}/Libraries/Mac"
+    )
+    
+    # Link X-Plane frameworks
+    target_link_libraries(${PROJECT_NAME}
         "-framework" "XPLM"
         "-framework" "XPWidgets"
         "-framework" "Carbon"
     )
     
     # Set export symbols
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        LINK_FLAGS "-Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/mac_exports.txt"
+    target_link_options(${PROJECT_NAME} PRIVATE
+        "-Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/mac_exports.txt"
     )
 
 elseif(WIN32)
@@ -167,22 +170,32 @@ elseif(UNIX AND NOT APPLE)
         PREFIX ""
     )
     
-    # Link X-Plane libraries
-    # On Linux, create imported targets for the SDK libraries
-    add_library(XPLM_64 SHARED IMPORTED)
-    set_target_properties(XPLM_64 PROPERTIES
+    # Verify SDK libraries exist
+    if(NOT EXISTS "${XPLM_SDK_PATH}/Libraries/Lin/XPLM_64.so")
+        message(FATAL_ERROR "XPLM_64.so not found at ${XPLM_SDK_PATH}/Libraries/Lin/XPLM_64.so")
+    endif()
+    if(NOT EXISTS "${XPLM_SDK_PATH}/Libraries/Lin/XPWidgets_64.so")
+        message(FATAL_ERROR "XPWidgets_64.so not found at ${XPLM_SDK_PATH}/Libraries/Lin/XPWidgets_64.so")
+    endif()
+    
+    # Link X-Plane libraries using imported targets
+    # This prevents CMake from trying to build them
+    add_library(XPLM_64_LIB SHARED IMPORTED GLOBAL)
+    set_target_properties(XPLM_64_LIB PROPERTIES
         IMPORTED_LOCATION "${XPLM_SDK_PATH}/Libraries/Lin/XPLM_64.so"
+        IMPORTED_NO_SONAME TRUE
     )
     
-    add_library(XPWidgets_64 SHARED IMPORTED)
-    set_target_properties(XPWidgets_64 PROPERTIES
+    add_library(XPWidgets_64_LIB SHARED IMPORTED GLOBAL)
+    set_target_properties(XPWidgets_64_LIB PROPERTIES
         IMPORTED_LOCATION "${XPLM_SDK_PATH}/Libraries/Lin/XPWidgets_64.so"
+        IMPORTED_NO_SONAME TRUE
     )
     
     # Link the imported libraries
     target_link_libraries(${PROJECT_NAME}
-        XPLM_64
-        XPWidgets_64
+        XPLM_64_LIB
+        XPWidgets_64_LIB
         dl  # Dynamic link library
     )
     
