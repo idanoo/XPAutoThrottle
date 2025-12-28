@@ -12,26 +12,38 @@
 #include "XPWidgetDefs.h"
 
 // Window dimensions
-const int WINDOW_WIDTH = 300;
-const int WINDOW_HEIGHT = 135;
+const int WINDOW_WIDTH = 130;
+const int WINDOW_HEIGHT = 310;
 const int WINDOW_LEFT = 100;
 const int WINDOW_TOP = 600;
 const int WINDOW_RIGHT = WINDOW_LEFT + WINDOW_WIDTH;
 const int WINDOW_BOTTOM = WINDOW_TOP - WINDOW_HEIGHT;
-const int STATUS_LABEL_Y = WINDOW_TOP - 25;  // Combined RPM and Throttle
-const int SLIDER_Y = WINDOW_TOP - 45;
-const int SLIDER_VALUE_LABEL_Y = WINDOW_TOP - 65;
-const int CHECKBOX_Y = WINDOW_TOP - 85;
-const int BUTTON_Y = WINDOW_TOP - 110;
+const int RPM_LABEL_Y = WINDOW_TOP - 25;
+const int THROTTLE_LABEL_Y = WINDOW_TOP - 45;
+const int SLIDER_X = WINDOW_LEFT + 10;
+const int SLIDER_Y_TOP = WINDOW_TOP - 70;     // Top of slider (closer to window top, larger Y)
+const int SLIDER_Y_BOTTOM = WINDOW_TOP - 220; // Bottom of slider (further from window top, smaller Y)
+const int SLIDER_WIDTH = 20;
+const int PRESET_BUTTON_X = SLIDER_X + SLIDER_WIDTH + 15; // To the right of slider with more spacing
+const int PRESET_BUTTON_WIDTH = 35;
+const int PRESET_BUTTON_HEIGHT = 20;
+const int PRESET_2400_Y = SLIDER_Y_TOP; // Top preset button
+const int PRESET_1000_Y = PRESET_2400_Y - PRESET_BUTTON_HEIGHT - 5; // Stacked under 2400 button with more space
+const int SLIDER_VALUE_LABEL_Y = WINDOW_TOP - 230;
+const int CHECKBOX_Y = WINDOW_TOP - 250;
+const int BUTTON_Y = WINDOW_TOP - 275;
 
 const char* DATAREF_ENGINE_RPM = "sim/cockpit2/engine/indicators/engine_speed_rpm";
 const char* DATAREF_THROTTLE_POSITION = "sim/cockpit2/engine/actuators/throttle_ratio_all";
 
 static XPWidgetID g_main_window = nullptr;
-static XPWidgetID g_status_label = nullptr;  // Combined RPM and Throttle label
+static XPWidgetID g_rpm_label = nullptr;
+static XPWidgetID g_throttle_label = nullptr;
 static XPWidgetID g_rpm_slider = nullptr;
 static XPWidgetID g_slider_value_label = nullptr;
-static XPWidgetID g_autothrottle_checkbox = nullptr;
+static XPWidgetID g_rpm_preset_2400 = nullptr;
+static XPWidgetID g_rpm_preset_1000 = nullptr;
+static XPWidgetID g_autothrottle_button = nullptr;
 static XPWidgetID g_reload_button = nullptr;
 
 static bool g_autothrottle_enabled = false;
@@ -47,7 +59,8 @@ static float g_rpm_out_of_tolerance_start_time = -1.0f;
 static int WidgetCallback(XPWidgetMessage inMessage, XPWidgetID inWidget, intptr_t inParam1, intptr_t inParam2);
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void* inRefcon);
 static void UpdateDatarefHandles(void);
-static void UpdateStatusLabel(void);
+static void UpdateRpmLabel(void);
+static void UpdateThrottleLabel(void);
 static void UpdateSliderValueLabel(void);
 static void UpdateAutothrottle(void);
 static void CreatePopupWindow(void);
@@ -80,10 +93,13 @@ PLUGIN_API void XPluginStop(void) {
     if (g_main_window) {
         XPDestroyWidget(g_main_window, 1);
         g_main_window = nullptr;
-        g_status_label = nullptr;
+        g_rpm_label = nullptr;
+        g_throttle_label = nullptr;
         g_rpm_slider = nullptr;
         g_slider_value_label = nullptr;
-        g_autothrottle_checkbox = nullptr;
+        g_rpm_preset_2400 = nullptr;
+        g_rpm_preset_1000 = nullptr;
+        g_autothrottle_button = nullptr;
         g_reload_button = nullptr;
         g_rpm_dataref = nullptr;
         g_throttle_dataref = nullptr;
@@ -151,17 +167,27 @@ static void CreatePopupWindow(void) {
     if (g_main_window) {
         XPSetWidgetProperty(g_main_window, xpProperty_MainWindowHasCloseBoxes, 1);
         XPAddWidgetCallback(g_main_window, WidgetCallback);
-        // Create combined status label showing RPM and Throttle
-        g_status_label = XPCreateWidget(
-            WINDOW_LEFT + 10, STATUS_LABEL_Y, WINDOW_LEFT + WINDOW_WIDTH - 10, STATUS_LABEL_Y - 20,
-            1, "RPM: 0 | Throttle: 0%",
+        
+        // Create RPM label
+        g_rpm_label = XPCreateWidget(
+            WINDOW_LEFT + 10, RPM_LABEL_Y, WINDOW_LEFT + WINDOW_WIDTH - 10, RPM_LABEL_Y - 20,
+            1, "RPM: 0",
             0, g_main_window,
             xpWidgetClass_Caption
         );
         
-        // Create RPM slider (0 to 2500)
+        // Create Throttle label
+        g_throttle_label = XPCreateWidget(
+            WINDOW_LEFT + 10, THROTTLE_LABEL_Y, WINDOW_LEFT + WINDOW_WIDTH - 10, THROTTLE_LABEL_Y - 20,
+            1, "Throttle: 0%",
+            0, g_main_window,
+            xpWidgetClass_Caption
+        );
+        
+        // Create RPM slider (0 to 2500) - vertical slider
+        // Vertical slider: narrow width (20px), tall height (150px)
         g_rpm_slider = XPCreateWidget(
-            WINDOW_LEFT + 10, SLIDER_Y, WINDOW_LEFT + WINDOW_WIDTH - 10, SLIDER_Y - 20,
+            SLIDER_X, SLIDER_Y_TOP, SLIDER_X + 20, SLIDER_Y_BOTTOM,
             1, "",
             0, g_main_window,
             xpWidgetClass_ScrollBar
@@ -182,27 +208,37 @@ static void CreatePopupWindow(void) {
             xpWidgetClass_Caption
         );
         
-        // Create autothrottle enable checkbox
-        // Create checkbox button first (small square for checkbox)
-        g_autothrottle_checkbox = XPCreateWidget(
-            WINDOW_LEFT + 10, CHECKBOX_Y, WINDOW_LEFT + 30, CHECKBOX_Y - 20,
-            1, "",  // Empty text, checkbox will be drawn
+        // Create preset RPM buttons to the right of slider
+        g_rpm_preset_2400 = XPCreateWidget(
+            PRESET_BUTTON_X, PRESET_2400_Y, PRESET_BUTTON_X + PRESET_BUTTON_WIDTH, PRESET_2400_Y - PRESET_BUTTON_HEIGHT,
+            1, "2400",
+            0, g_main_window,
+            xpWidgetClass_Button
+        );
+        XPSetWidgetProperty(g_rpm_preset_2400, xpProperty_ButtonType, xpPushButton);
+        XPSetWidgetProperty(g_rpm_preset_2400, xpProperty_ButtonBehavior, xpButtonBehaviorPushButton);
+        
+        g_rpm_preset_1000 = XPCreateWidget(
+            PRESET_BUTTON_X, PRESET_1000_Y, PRESET_BUTTON_X + PRESET_BUTTON_WIDTH, PRESET_1000_Y - PRESET_BUTTON_HEIGHT,
+            1, "1000",
+            0, g_main_window,
+            xpWidgetClass_Button
+        );
+        XPSetWidgetProperty(g_rpm_preset_1000, xpProperty_ButtonType, xpPushButton);
+        XPSetWidgetProperty(g_rpm_preset_1000, xpProperty_ButtonBehavior, xpButtonBehaviorPushButton);
+        
+        // Create autothrottle toggle button (ON/OFF) - same width as Reload button
+        g_autothrottle_button = XPCreateWidget(
+            WINDOW_LEFT + 10, CHECKBOX_Y, WINDOW_LEFT + 120, CHECKBOX_Y - 20,
+            1, "OFF",
             0, g_main_window,
             xpWidgetClass_Button
         );
         
-        // Set checkbox properties
-        XPSetWidgetProperty(g_autothrottle_checkbox, xpProperty_ButtonType, xpRadioButton);
-        XPSetWidgetProperty(g_autothrottle_checkbox, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
-        XPSetWidgetProperty(g_autothrottle_checkbox, xpProperty_ButtonState, 0); // Unchecked by default
-        
-        // Create label for checkbox text (positioned to the right of checkbox)
-        XPWidgetID checkbox_label = XPCreateWidget(
-            WINDOW_LEFT + 35, CHECKBOX_Y, WINDOW_LEFT + 200, CHECKBOX_Y - 20,
-            1, "Enable Autothrottle",
-            0, g_main_window,
-            xpWidgetClass_Caption
-        );
+        // Set button properties
+        XPSetWidgetProperty(g_autothrottle_button, xpProperty_ButtonType, xpPushButton);
+        XPSetWidgetProperty(g_autothrottle_button, xpProperty_ButtonBehavior, xpButtonBehaviorPushButton);
+        XPSetWidgetProperty(g_autothrottle_button, xpProperty_Hilited, 0); // Not hilited (grey) by default - OFF state
         
         g_reload_button = XPCreateWidget(
             WINDOW_LEFT + 10, BUTTON_Y, WINDOW_LEFT + 120, BUTTON_Y - 20,
@@ -226,8 +262,22 @@ int WidgetCallback(XPWidgetMessage inMessage, XPWidgetID inWidget, intptr_t inPa
         }
     }
     
-    // Handle reload button press
+    // Handle preset RPM button presses
     if (inMessage == xpMsg_PushButtonPressed) {
+        if ((XPWidgetID)inParam1 == g_rpm_preset_2400) {
+            // Set slider to 2400 RPM (already a 100 increment)
+            XPSetWidgetProperty(g_rpm_slider, xpProperty_ScrollBarSliderPosition, 2400);
+            // Update label immediately
+            UpdateSliderValueLabel();
+            return 1;
+        }
+        if ((XPWidgetID)inParam1 == g_rpm_preset_1000) {
+            // Set slider to 1000 RPM (already a 100 increment)
+            XPSetWidgetProperty(g_rpm_slider, xpProperty_ScrollBarSliderPosition, 1000);
+            // Update label immediately
+            UpdateSliderValueLabel();
+            return 1;
+        }
         if ((XPWidgetID)inParam1 == g_reload_button) {
             XPLMReloadPlugins();
             return 1;
@@ -258,12 +308,19 @@ int WidgetCallback(XPWidgetMessage inMessage, XPWidgetID inWidget, intptr_t inPa
         }
     }
     
-    // Handle checkbox state change
-    if (inMessage == xpMsg_ButtonStateChanged) {
-        if ((XPWidgetID)inParam1 == g_autothrottle_checkbox) {
-            // Get checkbox state
-            int checkbox_state = (int)XPGetWidgetProperty(g_autothrottle_checkbox, xpProperty_ButtonState, NULL);
-            g_autothrottle_enabled = (checkbox_state != 0);
+    // Handle autothrottle button press
+    if (inMessage == xpMsg_PushButtonPressed) {
+        if ((XPWidgetID)inParam1 == g_autothrottle_button) {
+            // Toggle autothrottle state
+            g_autothrottle_enabled = !g_autothrottle_enabled;
+            
+            // Update button text and appearance
+            if (g_autothrottle_enabled) {
+                XPSetWidgetDescriptor(g_autothrottle_button, "ON");
+                // Note: XPWidgets doesn't directly support color changes, but we can use text to indicate state
+            } else {
+                XPSetWidgetDescriptor(g_autothrottle_button, "OFF");
+            }
             return 1;
         }
     }
@@ -279,15 +336,16 @@ float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceL
 
     g_total_elapsed_time += inElapsedSinceLastCall;
     
-    UpdateStatusLabel();
+    UpdateRpmLabel();
+    UpdateThrottleLabel();
     UpdateSliderValueLabel();
     UpdateAutothrottle();
     
     return 0.1f;
 }
 
-static void UpdateStatusLabel(void) {
-    if (!g_status_label) {
+static void UpdateRpmLabel(void) {
+    if (!g_rpm_label) {
         return;
     }
     
@@ -312,6 +370,21 @@ static void UpdateStatusLabel(void) {
         }
     }
     
+    char rpm_text[256];
+    if (g_rpm_dataref) {
+        snprintf(rpm_text, sizeof(rpm_text), "RPM: %.0f", rpm_value);
+    } else {
+        snprintf(rpm_text, sizeof(rpm_text), "RPM: INVALID");
+    }
+
+    XPSetWidgetDescriptor(g_rpm_label, rpm_text);
+}
+
+static void UpdateThrottleLabel(void) {
+    if (!g_throttle_label) {
+        return;
+    }
+    
     // Read current throttle value
     float throttle_value = 0.0f;
     if (g_throttle_dataref) {
@@ -329,18 +402,16 @@ static void UpdateStatusLabel(void) {
     // Clamp throttle value to valid range (0.0-1.0) and convert to percentage
     if (throttle_value < 0.0f) throttle_value = 0.0f;
     if (throttle_value > 1.0f) throttle_value = 1.0f;
-    int throttle_percent = (int)(throttle_value * 100.0f + 0.5f); // Round to nearest integer
+    float throttle_percent = throttle_value * 100.0f; // Convert to percentage
     
-    char status_text[256];
-    if (g_rpm_dataref && g_throttle_dataref) {
-        snprintf(status_text, sizeof(status_text), "RPM: %.0f | Throttle: %d%%", rpm_value, throttle_percent);
+    char throttle_text[256];
+    if (g_throttle_dataref) {
+        snprintf(throttle_text, sizeof(throttle_text), "Throttle: %.1f%%", throttle_percent);
     } else {
-        snprintf(status_text, sizeof(status_text), "RPM: %s | Throttle: %s",
-                 g_rpm_dataref ? "OK" : "INVALID",
-                 g_throttle_dataref ? "OK" : "INVALID");
+        snprintf(throttle_text, sizeof(throttle_text), "Throttle: INVALID");
     }
 
-    XPSetWidgetDescriptor(g_status_label, status_text);
+    XPSetWidgetDescriptor(g_throttle_label, throttle_text);
 }
 
 // Update slider value label to show current target RPM
@@ -405,7 +476,7 @@ static void UpdateAutothrottle(void) {
     float rpm_diff = (float)target_rpm - current_rpm;
     
     const float RPM_TOLERANCE = 15.0f; // Keep it within 15 RPM of the target RPM
-    const float THROTTLE_ADJUSTMENT = 0.005f; // Adjust by 0.5% for every 100 RPM off target
+    const float THROTTLE_ADJUSTMENT = 0.001f; // Adjust by 0.5% for every 100 RPM off target
     const float SETTLE_TIME = 2.0f; // Wait 2 seconds before any adjustment
     const float MIN_ADJUST_INTERVAL = 1.0f; // Only adjust once per second
     
